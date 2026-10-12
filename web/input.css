@@ -1,0 +1,55 @@
+@import "tailwindcss";
+@source "../templates/report.html.tmpl";
+
+@layer base {
+  body { font-size: 15px; line-height: 1.5; }
+  summary { cursor: pointer; list-style: none; }
+  summary::-webkit-details-marker { display: none; }
+  summary::before {
+    content: "▸"; display: inline-block; margin-right: .5rem;
+    color: var(--color-slate-400); transition: transform .15s;
+  }
+  details[open] > summary::before { transform: rotate(90deg); }
+}
+
+@layer components {
+  .card {
+    @apply rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900;
+  }
+  .label { @apply mb-1 block text-xs text-slate-500 dark:text-slate-400; }
+  .field {
+    @apply w-full rounded-lg border border-slate-200 bg-white px-3 py-2 outline-none
+      focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20
+      dark:border-slate-700 dark:bg-slate-900;
+  }
+  .btn {
+    @apply cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-1.5
+      hover:border-blue-500 dark:border-slate-700 dark:bg-slate-900;
+  }
+  .btn-sm { @apply px-2.5 py-0.5 text-[0.82rem]; }
+  .btn-xs { @apply px-2 py-0.5 text-xs; }
+  .btn-primary {
+    @apply border-blue-600 bg-blue-600 text-white hover:bg-blue-700
+      dark:border-blue-500 dark:bg-blue-500 dark:text-slate-950;
+  }
+  .badge { @apply rounded-full px-2.5 py-0.5 text-xs whitespace-nowrap; }
+  /* File-type chips are created by the script. */
+  .chip {
+    @apply cursor-pointer rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-[0.82rem]
+      hover:border-blue-500 dark:border-slate-700 dark:bg-slate-900;
+  }
+  .chip small { @apply ml-1 text-slate-400; }
+  .chip.on { @apply border-blue-600 bg-blue-600 text-white dark:border-blue-500 dark:bg-blue-500 dark:text-slate-950; }
+  .chip.on small { @apply text-inherit opacity-80; }
+  #cmdcount small { @apply font-normal text-slate-500 dark:text-slate-400; }
+}
+
+/* State classes toggled by the script. Unlayered so they win over utilities. */
+details.group.all-selected { @apply border-red-500 ring-1 ring-red-500; }
+tr.selected { @apply bg-red-50 dark:bg-red-950/50; }
+tr.selected td.path { @apply line-through decoration-red-500; }
+tr.size-hidden { display: none; }
+tr.same-size td.size::after {
+  content: "same size";
+  @apply block text-[0.72rem] text-blue-600 dark:text-blue-400;
+}

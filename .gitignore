@@ -1,0 +1,8 @@
+# The compiled program
+/dupe-finder
+
+# Node packages (reinstall with: cd web && npm install)
+web/node_modules/
+
+# Reports the program creates
+*.html

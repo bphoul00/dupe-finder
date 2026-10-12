@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="en" class="scheme-light dark:scheme-dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Duplicate File Names</title>
+<style>{{.CSS}}</style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased dark:bg-slate-950 dark:text-slate-200">
+<main class="mx-auto max-w-5xl px-4 pt-6 pb-36">
+  <h1 class="text-2xl font-bold">Duplicate file names</h1>
+  <p class="mb-5 break-all text-slate-500 dark:text-slate-400">{{.Root}} · generated {{.Generated}}{{if .IgnoreCase}} · case-insensitive{{end}}</p>
+
+  <div class="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+    <div class="card px-4 py-3"><b class="block text-2xl">{{len .Groups}}</b><span class="text-sm text-slate-500 dark:text-slate-400">duplicated names</span></div>
+    <div class="card px-4 py-3"><b class="block text-2xl">{{copies .ScanResult}}</b><span class="text-sm text-slate-500 dark:text-slate-400">files involved</span></div>
+    <div class="card px-4 py-3"><b class="block text-2xl">{{.FilesSeen}}</b><span class="text-sm text-slate-500 dark:text-slate-400">files scanned</span></div>
+    <div class="card px-4 py-3"><b class="block text-2xl">{{.DirsSeen}}</b><span class="text-sm text-slate-500 dark:text-slate-400">folders scanned</span></div>
+  </div>
+
+  {{if .Groups}}
+  <details class="card mb-4" open>
+    <summary class="px-4 py-3 font-semibold">Filters</summary>
+    <div class="grid gap-4 px-4 pb-4">
+      <div class="grid gap-3 md:grid-cols-[2fr_2fr_1fr]">
+        <div><label class="label" for="q">File name contains</label><input class="field" id="q" type="search" placeholder="e.g. README" autocomplete="off"></div>
+        <div><label class="label" for="fdir">Folder contains</label><input class="field" id="fdir" type="search" placeholder="e.g. profile-app" autocomplete="off"></div>
+        <div><label class="label" for="fmin">Minimum copies</label><input class="field" id="fmin" type="number" min="2" value="2"></div>
+      </div>
+      <div>
+        <span class="label">File type <span id="chipnote">(nothing selected = nothing shown)</span></span>
+        <div class="flex max-h-40 flex-wrap gap-1.5 overflow-y-auto" id="chips"></div>
+      </div>
+      <div class="flex flex-wrap items-center justify-between gap-x-5 gap-y-2">
+        <label class="flex cursor-pointer items-center gap-2"><input type="checkbox" id="fsel" class="size-4 accent-blue-600"> Only show groups with selected files</label>
+        <label class="flex cursor-pointer items-center gap-2" title="A file only counts as a duplicate if another copy has the same name and exactly the same size"><input type="checkbox" id="fsize" class="size-4 accent-blue-600"> Same size only</label>
+        <span class="text-sm text-slate-500 dark:text-slate-400" id="showing"></span>
+        <button type="button" class="btn" id="freset">Reset filters</button>
+      </div>
+    </div>
+  </details>
+
+  <div class="mb-3 flex flex-wrap justify-end gap-2">
+    <button type="button" class="btn" id="expand">Expand all</button>
+    <button type="button" class="btn" id="collapse">Collapse all</button>
+  </div>
+
+  <div id="groups">
+  {{range .Groups}}
+    <details class="group card mb-2.5" data-name="{{lower .Name}}" data-ext="{{ext .Name}}" data-dirs="{{dirs .Files}}" data-count="{{len .Files}}">
+      <summary class="flex items-center gap-2.5 px-4 py-3">
+        <span class="flex-1 break-all font-mono font-semibold">{{.Name}}</span>
+        <span class="hidden whitespace-nowrap text-xs text-red-600 group-[.all-selected]:inline dark:text-red-400">⚠ every copy selected</span>
+        <span class="badge sel bg-red-50 text-red-600 empty:hidden dark:bg-red-950 dark:text-red-400"></span>
+        <span class="badge copies bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400">{{len .Files}} copies</span>
+      </summary>
+      <div class="flex flex-wrap items-center gap-1.5 border-t border-slate-200 px-4 py-2 text-sm dark:border-slate-800">
+        <span class="mr-1 text-slate-500 dark:text-slate-400">Select all except:</span>
+        <button type="button" class="btn btn-sm" data-keep="newest">Keep newest</button>
+        <button type="button" class="btn btn-sm" data-keep="oldest">Keep oldest</button>
+        <button type="button" class="btn btn-sm" data-keep="largest">Keep largest</button>
+        <button type="button" class="btn btn-sm" data-keep="first">Keep first</button>
+        <button type="button" class="btn btn-sm" data-keep="none">Clear</button>
+      </div>
+      <div class="overflow-x-auto border-t border-slate-200 dark:border-slate-800">
+        <table class="w-full text-left text-sm">
+          <thead class="text-slate-500 dark:text-slate-400">
+            <tr>
+              <th class="w-px py-2 pr-0 pl-4"><input type="checkbox" class="all size-4 cursor-pointer accent-red-600" aria-label="Select all copies" title="Select all copies"></th>
+              <th class="px-4 py-2 font-medium">Location</th>
+              <th class="px-4 py-2 font-medium whitespace-nowrap">Size</th>
+              <th class="px-4 py-2 font-medium whitespace-nowrap">Modified</th>
+              <th class="hidden sm:table-cell"></th>
+            </tr>
+          </thead>
+          <tbody>
+          {{range .Files}}
+            <tr class="odd:bg-slate-50 dark:odd:bg-slate-800/40" data-path="{{.Path}}" data-size="{{.Size}}" data-mtime="{{unix .ModTime}}">
+              <td class="w-px py-2 pr-0 pl-4"><input type="checkbox" class="size-4 cursor-pointer accent-red-600" aria-label="Select for deletion"></td>
+              <td class="path px-4 py-2 break-all font-mono" title="{{.Path}}">{{.Dir}}</td>
+              <td class="size px-4 py-2 whitespace-nowrap">{{size .Size}}</td>
+              <td class="px-4 py-2 whitespace-nowrap">{{date .ModTime}}</td>
+              <td class="hidden px-4 py-2 sm:table-cell"><button type="button" class="btn btn-xs whitespace-nowrap" data-keep="this">Keep only this</button></td>
+            </tr>
+          {{end}}
+          </tbody>
+        </table>
+      </div>
+    </details>
+  {{end}}
+  </div>
+  <p class="p-8 text-center text-slate-500 dark:text-slate-400" id="nomatch" hidden>No names match your filters.</p>
+  {{else}}
+  <p class="p-8 text-center text-slate-500 dark:text-slate-400">No duplicate file names found.</p>
+  {{end}}
+
+  {{if .Warnings}}
+  <details class="mt-7 text-sm text-slate-500 dark:text-slate-400">
+    <summary class="py-2">{{len .Warnings}} folders could not be read</summary>
+    <ul class="list-disc pl-6">{{range .Warnings}}<li class="break-all">{{.}}</li>{{end}}</ul>
+  </details>
+  {{end}}
+</main>
+
+<div id="cmdbar" class="fixed inset-x-0 bottom-0 z-10 border-t border-slate-200 bg-white shadow-[0_-4px_16px_rgba(0,0,0,.12)] dark:border-slate-800 dark:bg-slate-900" hidden>
+  <div class="mx-auto grid max-w-5xl gap-2 px-4 py-3">
+    <div class="flex flex-wrap items-center gap-x-3.5 gap-y-2">
+      <div class="flex-[1_1_200px] font-semibold" id="cmdcount"></div>
+      <div class="flex flex-wrap items-center gap-1.5">
+        <label class="mr-1.5 flex cursor-pointer items-center gap-1.5 text-sm" title="Use 'gio trash' so files go to the trash and can be restored"><input type="checkbox" id="trash" class="size-4 accent-blue-600"> Move to trash instead</label>
+        <button type="button" class="btn btn-primary" id="copy">Copy command</button>
+        <button type="button" class="btn" id="download">Download .sh</button>
+        <button type="button" class="btn" id="toggle">Show command</button>
+        <button type="button" class="btn" id="clearall">Clear all</button>
+      </div>
+    </div>
+    <div class="rounded-lg bg-red-50 px-2.5 py-1.5 text-sm text-red-700 empty:hidden dark:bg-red-950 dark:text-red-300" id="cmdwarn"></div>
+    <div class="rounded-lg bg-amber-50 px-2.5 py-1.5 text-sm text-amber-800 empty:hidden dark:bg-amber-950 dark:text-amber-300" id="cmdnote"></div>
+    <pre id="cmdpre" class="max-h-[35vh] overflow-auto rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 font-mono text-xs/relaxed whitespace-pre select-all dark:border-slate-800 dark:bg-slate-950" hidden></pre>
+  </div>
+</div>
+
+<script>
+(function () {
+  var groupsEl = document.getElementById("groups");
+  if (!groupsEl) return;
+  var groups = Array.prototype.slice.call(groupsEl.children);
+  var $ = function (id) { return document.getElementById(id); };
+
+  // ---------- helpers ----------
+  function rowsOf(g) { return Array.prototype.slice.call(g.querySelectorAll("tbody tr")); }
+  function boxOf(tr) { return tr.querySelector("input[type=checkbox]"); }
+  function visibleRows(g) { return rowsOf(g).filter(function (tr) { return !tr.classList.contains("size-hidden"); }); }
+  function human(n) {
+    var u = ["B", "KB", "MB", "GB", "TB"], i = 0;
+    while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+    return (i ? n.toFixed(1) : n) + " " + u[i];
+  }
+  function shq(s) { return "'" + s.replace(/'/g, "'\\''") + "'"; }
+
+  // ---------- selection ----------
+  function setRow(tr, on) {
+    boxOf(tr).checked = on;
+    tr.classList.toggle("selected", on);
+  }
+  function refreshGroup(g) {
+    var rows = rowsOf(g), n = 0;
+    rows.forEach(function (tr) { if (boxOf(tr).checked) n++; });
+    g.querySelector(".badge.sel").textContent = n ? n + " selected" : "";
+    g.dataset.sel = n;
+    // Header checkbox mirrors the rows currently shown.
+    var vis = visibleRows(g), vn = 0;
+    vis.forEach(function (tr) { if (boxOf(tr).checked) vn++; });
+    // Warn when every copy is ticked, or every same-size copy while "Same size only" is on.
+    g.classList.toggle("all-selected", (n > 0 && n === rows.length) || (vn > 0 && vn === vis.length));
+    var all = g.querySelector("input.all");
+    all.checked = vn > 0 && vn === vis.length;
+    all.indeterminate = vn > 0 && vn < vis.length;
+  }
+
+  // keep ticks every visible copy except the chosen one. Copies hidden by
+  // "Same size only" are left as they are.
+  function keep(g, how, row) {
+    var rows = visibleRows(g), keepRow = null;
+    if (how === "none") { rowsOf(g).forEach(function (tr) { setRow(tr, false); }); refreshGroup(g); return; }
+    if (how === "this") keepRow = row;
+    else if (how === "first") keepRow = rows[0];
+    else {
+      var key = how === "largest" ? "size" : "mtime";
+      var sign = how === "oldest" ? -1 : 1;
+      rows.forEach(function (tr) {
+        if (!keepRow || sign * (+tr.dataset[key] - +keepRow.dataset[key]) > 0) keepRow = tr;
+      });
+    }
+    rows.forEach(function (tr) { setRow(tr, tr !== keepRow); });
+    refreshGroup(g);
+  }
+
+  groupsEl.addEventListener("change", function (e) {
+    if (e.target.type !== "checkbox") return;
+    if (e.target.classList.contains("all")) {
+      var g = e.target.closest("details.group"), on = e.target.checked;
+      visibleRows(g).forEach(function (tr) { setRow(tr, on); });
+      refreshGroup(g);
+      update();
+      return;
+    }
+    var tr = e.target.closest("tr");
+    setRow(tr, e.target.checked);
+    refreshGroup(tr.closest("details.group"));
+    update();
+  });
+  groupsEl.addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-keep]");
+    if (!b) return;
+    keep(b.closest("details.group"), b.dataset.keep, b.closest("tr"));
+    update();
+  });
+
+  // ---------- command bar ----------
+  var bar = $("cmdbar"), pre = $("cmdpre"), trash = $("trash");
+
+  function selectedRows() {
+    var out = [];
+    groups.forEach(function (g) {
+      if (+g.dataset.sel > 0) rowsOf(g).forEach(function (tr) { if (boxOf(tr).checked) out.push(tr); });
+    });
+    return out;
+  }
+  function buildCommand(rows) {
+    var cmd = trash.checked ? "gio trash --" : "\\rm -fv --";
+    return cmd + " \\\n  " + rows.map(function (tr) { return shq(tr.dataset.path); }).join(" \\\n  ");
+  }
+
+  function update() {
+    applyFilters();
+    var rows = selectedRows();
+    bar.hidden = rows.length === 0;
+    if (!rows.length) return;
+    var bytes = 0, hidden = 0, allGone = 0;
+    rows.forEach(function (tr) {
+      bytes += +tr.dataset.size;
+      if (tr.classList.contains("size-hidden") || tr.closest("details.group").hidden) hidden++;
+    });
+    groups.forEach(function (g) { if (g.classList.contains("all-selected")) allGone++; });
+    $("cmdcount").innerHTML = "";
+    $("cmdcount").append(rows.length + " file" + (rows.length > 1 ? "s" : "") + " selected ");
+    var sm = document.createElement("small");
+    sm.textContent = "· " + human(bytes);
+    $("cmdcount").append(sm);
+    $("cmdwarn").textContent = allGone
+      ? "⚠ " + allGone + " group" + (allGone > 1 ? "s" : "") + " would lose every copy. Look for the red-outlined groups."
+      : "";
+    $("cmdnote").textContent = hidden
+      ? hidden + " selected file" + (hidden > 1 ? "s are" : " is") + " hidden by the current filters but still included in the command."
+      : "";
+    if (!pre.hidden) pre.textContent = buildCommand(rows);
+  }
+
+  function copyText(text, btn) {
+    var done = function () {
+      var old = btn.textContent; btn.textContent = "Copied ✓";
+      setTimeout(function () { btn.textContent = old; }, 1500);
+    };
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(done, function () { fallback(text); done(); });
+    } else { fallback(text); done(); }
+  }
+  function fallback(text) {
+    var ta = document.createElement("textarea");
+    ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); } catch (e) {}
+    document.body.removeChild(ta);
+  }
+
+  $("copy").onclick = function () { copyText(buildCommand(selectedRows()), this); };
+  $("download").onclick = function () {
+    var body = "#!/usr/bin/env bash\nset -euo pipefail\n\n" + buildCommand(selectedRows()) + "\n";
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([body], { type: "text/x-shellscript" }));
+    a.download = "delete-duplicates.sh";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  };
+  $("toggle").onclick = function () {
+    pre.hidden = !pre.hidden;
+    this.textContent = pre.hidden ? "Show command" : "Hide command";
+    if (!pre.hidden) pre.textContent = buildCommand(selectedRows());
+  };
+  trash.onchange = function () { if (!pre.hidden) pre.textContent = buildCommand(selectedRows()); };
+  $("clearall").onclick = function () {
+    groups.forEach(function (g) { if (+g.dataset.sel > 0) keep(g, "none"); });
+    update();
+  };
+
+  // ---------- filters ----------
+  var q = $("q"), fdir = $("fdir"), fmin = $("fmin"), fsel = $("fsel"), fsize = $("fsize"), chipsEl = $("chips");
+
+  // Mark copies whose size matches at least one other copy of the same name.
+  groups.forEach(function (g) {
+    var rows = rowsOf(g), bySize = {}, same = 0;
+    rows.forEach(function (tr) { bySize[tr.dataset.size] = (bySize[tr.dataset.size] || 0) + 1; });
+    rows.forEach(function (tr) {
+      if (bySize[tr.dataset.size] > 1) { tr.classList.add("same-size"); same++; }
+    });
+    g.dataset.same = same;
+  });
+
+  function applySizeMode() {
+    var on = fsize.checked;
+    groups.forEach(function (g) {
+      rowsOf(g).forEach(function (tr) {
+        tr.classList.toggle("size-hidden", on && !tr.classList.contains("same-size"));
+      });
+      var total = +g.dataset.count;
+      g.querySelector(".badge.copies").textContent = on && +g.dataset.same !== total
+        ? g.dataset.same + " of " + total + " copies same size"
+        : total + " copies";
+      refreshGroup(g);
+    });
+  }
+  // File types: "All" shows every type; picking a type turns "All" off;
+  // nothing picked shows nothing.
+  var allTypes = true, activeExt = {};
+
+  function addChip(ext, label, count) {
+    var b = document.createElement("button");
+    b.type = "button"; b.className = "chip"; b.dataset.ext = ext;
+    b.textContent = label;
+    var sm = document.createElement("small"); sm.textContent = count;
+    b.appendChild(sm);
+    chipsEl.appendChild(b);
+  }
+  function syncChips() {
+    Array.prototype.forEach.call(chipsEl.children, function (c) {
+      c.classList.toggle("on", c.dataset.ext === "*" ? allTypes : !!activeExt[c.dataset.ext]);
+    });
+  }
+
+  var extCount = {};
+  groups.forEach(function (g) { extCount[g.dataset.ext] = (extCount[g.dataset.ext] || 0) + 1; });
+  addChip("*", "All", groups.length);
+  Object.keys(extCount).sort(function (a, b) {
+    if (a === "(none)") return 1; // "no extension" goes last
+    if (b === "(none)") return -1;
+    return a.localeCompare(b);
+  }).forEach(function (ext) {
+    addChip(ext, ext === "(none)" ? "no extension" : "." + ext, extCount[ext]);
+  });
+  syncChips();
+
+  chipsEl.addEventListener("click", function (e) {
+    var b = e.target.closest(".chip");
+    if (!b) return;
+    var ext = b.dataset.ext;
+    if (ext === "*") {
+      allTypes = !allTypes;
+      activeExt = {};
+    } else {
+      allTypes = false;
+      if (activeExt[ext]) delete activeExt[ext]; else activeExt[ext] = true;
+    }
+    syncChips();
+    update();
+  });
+
+  function applyFilters() {
+    var term = q.value.trim().toLowerCase();
+    var dir = fdir.value.trim().toLowerCase();
+    var min = Math.max(2, parseInt(fmin.value, 10) || 2);
+    var shown = 0;
+    groups.forEach(function (g) {
+      var hit = (!term || g.dataset.name.indexOf(term) !== -1)
+        && (!dir || g.dataset.dirs.indexOf(dir) !== -1)
+        && +(fsize.checked ? g.dataset.same : g.dataset.count) >= min
+        && (allTypes || activeExt[g.dataset.ext])
+        && (!fsel.checked || +g.dataset.sel > 0);
+      g.hidden = !hit;
+      if (hit) shown++;
+    });
+    $("showing").textContent = "Showing " + shown + " of " + groups.length + " names";
+    $("nomatch").hidden = shown !== 0;
+  }
+
+  [q, fdir, fmin].forEach(function (el) { el.addEventListener("input", update); });
+  fsel.addEventListener("change", update);
+  fsize.addEventListener("change", function () { applySizeMode(); update(); });
+  $("freset").onclick = function () {
+    q.value = ""; fdir.value = ""; fmin.value = 2; fsel.checked = false; allTypes = true; activeExt = {};
+    if (fsize.checked) { fsize.checked = false; applySizeMode(); }
+    syncChips();
+    update();
+  };
+
+  $("expand").onclick = function () { groups.forEach(function (g) { if (!g.hidden) g.open = true; }); };
+  $("collapse").onclick = function () { groups.forEach(function (g) { g.open = false; }); };
+
+  if (fsize.checked) applySizeMode(); // the browser may restore the checkbox on reload
+  update();
+})();
+</script>
+</body>
+</html>
